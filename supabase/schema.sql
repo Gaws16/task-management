@@ -1,6 +1,15 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Profiles Table (for user data)
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT,
+  full_name TEXT,
+  avatar_url TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Projects Table
 CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -39,6 +48,19 @@ CREATE TABLE IF NOT EXISTS tasks (
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+-- Set up RLS for profiles
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Profiles RLS Policies
+CREATE POLICY "Users can view all profiles"
+  ON profiles FOR SELECT
+  TO authenticated, anon
+  USING (true);  -- Anyone can see profiles
+
+CREATE POLICY "Users can update their own profile"
+  ON profiles FOR UPDATE
+  USING (id = auth.uid());
 
 -- Helper function to check if a user is a member of a project
 CREATE OR REPLACE FUNCTION is_member_of_project(project UUID)
@@ -215,4 +237,22 @@ $$;
 
 CREATE TRIGGER add_project_creator_trigger
 AFTER INSERT ON projects
-FOR EACH ROW EXECUTE PROCEDURE add_project_creator_as_owner(); 
+FOR EACH ROW EXECUTE PROCEDURE add_project_creator_as_owner();
+
+-- Automatically create a profile entry when a new user signs up
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'avatar_url');
+  RETURN NEW;
+END;
+$$;
+
+-- Trigger to create a profile after auth.users insert
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE handle_new_user(); 

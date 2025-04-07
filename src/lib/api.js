@@ -46,8 +46,25 @@ export const projectsApi = {
         .select()
         .single();
 
-      // If direct insert works, return the data
+      // If direct insert works, try to add the creator as owner
       if (!error) {
+        // Try to manually add the creator as owner (in case trigger didn't work)
+        try {
+          await supabase.from("project_members").insert([
+            {
+              project_id: data.id,
+              user_id: userId,
+              role: "owner",
+            },
+          ]);
+        } catch (memberErr) {
+          console.warn(
+            "Failed to add creator as member (might already exist):",
+            memberErr
+          );
+          // Continue anyway, as the project was created successfully
+        }
+
         return data;
       }
 
@@ -181,22 +198,58 @@ export const tasksApi = {
   async getByProject(projectId) {
     const { data, error } = await supabase
       .from("tasks")
-      .select("*, assignee:assignee_id(id, email, avatar_url, full_name)")
+      .select("*")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
+
+    // If we need assignee information, get it separately
+    if (data && data.length > 0) {
+      const tasksWithAssignees = await Promise.all(
+        data.map(async (task) => {
+          if (task.assignee_id) {
+            const { data: userData, error: userError } = await supabase
+              .from("profiles")
+              .select("id, email, avatar_url, full_name")
+              .eq("id", task.assignee_id)
+              .single();
+
+            if (!userError && userData) {
+              return { ...task, assignee: userData };
+            }
+          }
+          return task;
+        })
+      );
+      return tasksWithAssignees;
+    }
+
     return data;
   },
 
   async getById(id) {
     const { data, error } = await supabase
       .from("tasks")
-      .select("*, assignee:assignee_id(id, email, avatar_url, full_name)")
+      .select("*")
       .eq("id", id)
       .single();
 
     if (error) throw error;
+
+    // Get assignee data if needed
+    if (data && data.assignee_id) {
+      const { data: userData, error: userError } = await supabase
+        .from("profiles")
+        .select("id, email, avatar_url, full_name")
+        .eq("id", data.assignee_id)
+        .single();
+
+      if (!userError && userData) {
+        data.assignee = userData;
+      }
+    }
+
     return data;
   },
 

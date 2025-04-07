@@ -25,7 +25,7 @@ BEGIN
   INSERT INTO project_members (project_id, user_id, role)
   VALUES (new_project_id, creator_id, 'owner');
   
-  -- Return the project data
+  -- Return the project data with explicit column aliases to avoid ambiguity
   RETURN QUERY
   SELECT p.id, p.name, p.description, p.created_by
   FROM projects p

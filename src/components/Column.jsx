@@ -1,27 +1,29 @@
-import { useTasks } from '../context/TaskContext';
-import TaskCard from './TaskCard';
-import { useDrop } from 'react-dnd';
-import { motion } from 'framer-motion';
+import { useTasks } from "../context/TaskContext";
+import TaskCard from "./TaskCard";
+import { useDrop } from "react-dnd";
+import { motion } from "framer-motion";
 
-function Column({ id, title, color }) {
-  const { tasks, moveTask } = useTasks();
-  
-  // Филтриране на задачите по статус на колоната
-  const columnTasks = tasks.filter(task => task.status === id);
-  
-  // Конфигурация на drag and drop
+function Column({ id, title, color, projectId }) {
+  const { tasks, moveTask, getTasksByStatus } = useTasks();
+
+  // Filter tasks by column status
+  const columnTasks = getTasksByStatus(id);
+
+  // Drag and drop configuration
   const [{ isOver }, drop] = useDrop({
-    accept: 'task',
+    accept: "task",
     drop: (item) => moveTask(item.id, id),
     collect: (monitor) => ({
       isOver: !!monitor.isOver(),
     }),
   });
-  
+
   return (
-    <div 
+    <div
       ref={drop}
-      className={`bg-gray-800 rounded-xl shadow-xl overflow-hidden ${isOver ? 'ring-2 ring-indigo-400' : ''} 
+      className={`bg-gray-800 rounded-xl shadow-xl overflow-hidden ${
+        isOver ? "ring-2 ring-indigo-400" : ""
+      } 
                   transition-all duration-300 flex-1 lg:min-w-72 lg:max-w-80 h-fit`}
     >
       <div className={`${color} h-1.5 w-full`}></div>
@@ -32,7 +34,7 @@ function Column({ id, title, color }) {
             {columnTasks.length}
           </span>
         </div>
-        
+
         <div className="space-y-3 min-h-40">
           {columnTasks.map((task, index) => (
             <motion.div
@@ -41,13 +43,13 @@ function Column({ id, title, color }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
             >
-              <TaskCard task={task} />
+              <TaskCard task={task} projectId={projectId} />
             </motion.div>
           ))}
-          
+
           {columnTasks.length === 0 && (
             <div className="text-gray-500 text-center py-6 border-2 border-dashed border-gray-700 rounded-lg">
-              Няма задачи
+              No tasks
             </div>
           )}
         </div>
@@ -56,4 +58,4 @@ function Column({ id, title, color }) {
   );
 }
 
-export default Column; 
+export default Column;

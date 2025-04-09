@@ -144,20 +144,22 @@ export const projectMembersApi = {
 
   async inviteByEmail(projectId, email, role = "member") {
     // First, check if the user already exists in the system
-    const { data: users, error: userError } = await supabase
-      .from("auth.users")
+    // We need to use a different approach since we can't directly query auth.users
+    // Instead, we'll check if the user exists in our profiles table
+    const { data: profiles, error: profileError } = await supabase
+      .from("profiles")
       .select("id")
       .eq("email", email)
       .single();
 
-    if (userError && userError.code !== "PGRST116") {
+    if (profileError && profileError.code !== "PGRST116") {
       // PGRST116 is "not found" error
-      throw userError;
+      throw profileError;
     }
 
-    if (users) {
+    if (profiles) {
       // User exists, add them to the project
-      return this.addMember(projectId, users.id, role);
+      return this.addMember(projectId, profiles.id, role);
     } else {
       // User doesn't exist, send invitation email
       // This would typically integrate with an email service

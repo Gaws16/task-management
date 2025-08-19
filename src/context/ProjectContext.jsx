@@ -177,9 +177,8 @@ export function ProjectProvider({ children }) {
     if (project.created_by === user.id) return true;
 
     // Check if user is a member with one of the specified roles
-    const membership = project.project_members.find(
-      (m) => m.user_id === user.id
-    );
+    const memberList = project.members || project.project_members || [];
+    const membership = memberList.find((m) => m.user_id === user.id);
     return membership && roles.includes(membership.role);
   };
 

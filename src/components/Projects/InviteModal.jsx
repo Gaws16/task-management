@@ -31,7 +31,15 @@ function InviteModal({ projectId, onClose }) {
 
     try {
       const result = await inviteMember(projectId, email, role);
-      setSuccess(`Invitation sent to ${email}`);
+      if (result?.added) {
+        setSuccess(`Added ${email} to the project`);
+      } else if (result?.alreadyMember) {
+        setSuccess(`${email} is already a member`);
+      } else if (result?.pending) {
+        setSuccess(result?.message || `Invitation sent to ${email}`);
+      } else {
+        setSuccess(`Invitation processed for ${email}`);
+      }
       setEmail("");
     } catch (err) {
       setError(err.message || "Failed to send invitation");

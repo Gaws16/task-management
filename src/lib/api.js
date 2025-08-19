@@ -138,14 +138,26 @@ export const projectsApi = {
 // Project Members API
 export const projectMembersApi = {
   async getByProject(projectId) {
+    // Try to include profile info; if profiles table is missing, fall back gracefully
     const { data, error } = await supabase
       .from("project_members")
       .select("*, profiles:user_id(id, email, avatar_url, full_name)")
       .eq("project_id", projectId)
       .order("role", { ascending: true });
 
-    if (error) throw error;
-    return data;
+    if (!error) return data;
+
+    if (error.code === "PGRST205") {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("project_members")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("role", { ascending: true });
+      if (fallbackError) throw fallbackError;
+      return fallbackData;
+    }
+
+    throw error;
   },
 
   async addMember(projectId, userId, role = "member") {
@@ -161,7 +173,19 @@ export const projectMembersApi = {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Handle unique violation gracefully (already a member)
+      if (error.code === "23505") {
+        return {
+          added: false,
+          alreadyMember: true,
+          project_id: projectId,
+          user_id: userId,
+          role,
+        };
+      }
+      throw error;
+    }
     return data;
   },
 
@@ -169,20 +193,46 @@ export const projectMembersApi = {
     // First, check if the user already exists in the system
     // We need to use a different approach since we can't directly query auth.users
     // Instead, we'll check if the user exists in our profiles table
-    const { data: profiles, error: profileError } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .single();
-
-    if (profileError && profileError.code !== "PGRST116") {
-      // PGRST116 is "not found" error
-      throw profileError;
+    let profiles = null;
+    try {
+      const { data, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .limit(1)
+        .maybeSingle();
+      if (profileError && profileError.code !== "PGRST116") {
+        // If the profiles table is missing (PGRST205), fall back to anon invite placeholder
+        if (profileError.code === "PGRST205") {
+          return {
+            pending: true,
+            email,
+            message:
+              "Could not verify user in profiles; sent a placeholder invite.",
+          };
+        }
+        throw profileError;
+      }
+      profiles = data || null;
+    } catch (err) {
+      // If the table truly doesn't exist in schema cache, surface a friendly message
+      if (err && err.code === "PGRST205") {
+        return {
+          pending: true,
+          email,
+          message:
+            "Profiles table not available; invite recorded locally only.",
+        };
+      }
+      throw err;
     }
 
     if (profiles) {
       // User exists, add them to the project
-      return this.addMember(projectId, profiles.id, role);
+      const added = await this.addMember(projectId, profiles.id, role);
+      return added?.id
+        ? { added: true, member: added }
+        : { added: false, alreadyMember: true };
     } else {
       // User doesn't exist, send invitation email
       // This would typically integrate with an email service

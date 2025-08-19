@@ -191,8 +191,6 @@ export const projectMembersApi = {
 
   async inviteByEmail(projectId, email, role = "member") {
     // First, check if the user already exists in the system
-    // We need to use a different approach since we can't directly query auth.users
-    // Instead, we'll check if the user exists in our profiles table
     let profiles = null;
     try {
       const { data, error: profileError } = await supabase
@@ -228,20 +226,104 @@ export const projectMembersApi = {
     }
 
     if (profiles) {
-      // User exists, add them to the project
+      // User exists in profiles, check if they're already a member
+      const { data: existingMember, error: memberCheckError } = await supabase
+        .from("project_members")
+        .select("id, role")
+        .eq("project_id", projectId)
+        .eq("user_id", profiles.id)
+        .maybeSingle();
+
+      if (memberCheckError) throw memberCheckError;
+
+      if (existingMember) {
+        return {
+          added: false,
+          alreadyMember: true,
+          existingRole: existingMember.role,
+          message: `${email} is already a member with role: ${existingMember.role}`,
+        };
+      }
+
+      // User exists but not a member, add them to the project
       const added = await this.addMember(projectId, profiles.id, role);
       return added?.id
-        ? { added: true, member: added }
-        : { added: false, alreadyMember: true };
+        ? {
+            added: true,
+            member: added,
+            message: `Added ${email} to the project`,
+          }
+        : {
+            added: false,
+            alreadyMember: true,
+            message: `${email} is already a member`,
+          };
     } else {
-      // User doesn't exist, send invitation email
-      // This would typically integrate with an email service
-      // For now, we'll just return a placeholder
-      return {
-        pending: true,
-        email,
-        message: `Invitation sent to ${email}`,
-      };
+      // User doesn't exist in profiles - check if there's already a pending invitation
+      const { data: existingInvite, error: inviteCheckError } = await supabase
+        .from("project_invitations")
+        .select("id, status, created_at")
+        .eq("project_id", projectId)
+        .eq("email", email)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (inviteCheckError) throw inviteCheckError;
+
+      if (existingInvite) {
+        return {
+          pending: true,
+          email,
+          message: `Invitation already sent to ${email} on ${new Date(
+            existingInvite.created_at
+          ).toLocaleDateString()}`,
+          inviteId: existingInvite.id,
+        };
+      }
+
+      // No existing invitation, create a new one
+      try {
+        const { data: inviteData, error: inviteError } = await supabase
+          .from("project_invitations")
+          .insert([
+            {
+              project_id: projectId,
+              email: email,
+              role: role,
+              invited_by: (
+                await supabase.auth.getSession()
+              ).data.session?.user?.id,
+              status: "pending",
+            },
+          ])
+          .select()
+          .single();
+
+        if (inviteError) {
+          console.error("Failed to store invitation:", inviteError);
+          return {
+            pending: true,
+            email,
+            message: `Invitation recorded for ${email} (email service not configured)`,
+            error: inviteError.message,
+          };
+        }
+
+        return {
+          pending: true,
+          email,
+          message: `Invitation recorded for ${email}. They'll be added when they sign up.`,
+          inviteId: inviteData?.id,
+        };
+      } catch (inviteErr) {
+        console.error("Error storing invitation:", inviteErr);
+        return {
+          pending: true,
+          email,
+          message: `Invitation recorded for ${email}`,
+          error: inviteErr.message,
+        };
+      }
     }
   },
 

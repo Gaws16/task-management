@@ -32,13 +32,13 @@ function InviteModal({ projectId, onClose }) {
     try {
       const result = await inviteMember(projectId, email, role);
       if (result?.added) {
-        setSuccess(`Added ${email} to the project`);
+        setSuccess(result.message || `Added ${email} to the project`);
       } else if (result?.alreadyMember) {
-        setSuccess(`${email} is already a member`);
+        setSuccess(result.message || `${email} is already a member`);
       } else if (result?.pending) {
-        setSuccess(result?.message || `Invitation sent to ${email}`);
+        setSuccess(result.message || `Invitation sent to ${email}`);
       } else {
-        setSuccess(`Invitation processed for ${email}`);
+        setSuccess(result.message || `Invitation processed for ${email}`);
       }
       setEmail("");
     } catch (err) {

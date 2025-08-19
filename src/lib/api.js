@@ -13,16 +13,25 @@ export const projectsApi = {
   },
 
   async getById(id) {
-    const { data, error } = await supabase
+    // Get the project itself
+    const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("*, project_members(id, user_id, role)")
+      .select("*")
       .eq("id", id)
       .single();
 
-    if (error) throw error;
-    return data;
-  },
+    if (projectError) throw projectError;
 
+    // Get project members separately
+    const { data: members, error: membersError } = await supabase
+      .from("project_members")
+      .select("id, user_id, role") // you can also join profiles here
+      .eq("project_id", id);
+
+    if (membersError) throw membersError;
+
+    return { ...project, members };
+  },
   async create(project) {
     // Get current user ID
     const {

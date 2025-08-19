@@ -3,15 +3,29 @@ import { supabase } from "./supabase";
 // Projects API
 export const projectsApi = {
   async getAll() {
-    const { data, error } = await supabase
+    // Get projects
+    const { data: projects, error: projectsError } = await supabase
       .from("projects")
-      .select("*, project_members(id, user_id, role)")
+      .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
-    return data;
-  },
+    if (projectsError) throw projectsError;
 
+    // Get all project members in one go
+    const { data: members, error: membersError } = await supabase
+      .from("project_members")
+      .select("id, user_id, role, project_id");
+
+    if (membersError) throw membersError;
+
+    // Attach members to their projects
+    const projectsWithMembers = projects.map((project) => ({
+      ...project,
+      members: members.filter((m) => m.project_id === project.id),
+    }));
+
+    return projectsWithMembers;
+  },
   async getById(id) {
     // Get the project itself
     const { data: project, error: projectError } = await supabase

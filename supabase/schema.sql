@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS project_invitations (
   email TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
   invited_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'expired')) DEFAULT 'pending',
+  status TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'expired', 'declined')) DEFAULT 'pending',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
   UNIQUE(project_id, email)
@@ -199,6 +199,7 @@ CREATE POLICY "Project admins can view invitations"
   ON project_invitations FOR SELECT
   USING (
     is_admin_of_project(project_id)
+    OR lower(email) = lower((SELECT email FROM profiles WHERE id = auth.uid()))
   );
 
 CREATE POLICY "Project admins can insert invitations"
@@ -211,6 +212,7 @@ CREATE POLICY "Project admins can update invitations"
   ON project_invitations FOR UPDATE
   USING (
     is_admin_of_project(project_id)
+    OR lower(email) = lower((SELECT email FROM profiles WHERE id = auth.uid()))
   );
 
 CREATE POLICY "Project admins can delete invitations"

@@ -137,6 +137,73 @@ export const projectsApi = {
 
 // Project Members API
 export const projectMembersApi = {
+  async getInvitationsForCurrentUser() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const email = session?.user?.email;
+    if (!email) return [];
+
+    const { data, error } = await supabase
+      .from("project_invitations")
+      .select("id, project_id, email, role, status, created_at")
+      .eq("email", email)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async acceptInvitation(invitationId) {
+    // fetch invitation
+    const { data: invite, error: inviteErr } = await supabase
+      .from("project_invitations")
+      .select("id, project_id, email, role, status")
+      .eq("id", invitationId)
+      .single();
+    if (inviteErr) throw inviteErr;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    const email = session?.user?.email;
+    if (!userId || !email) throw new Error("User not authenticated");
+
+    if (invite.email !== email) throw new Error("Invitation not for this user");
+
+    // add member then mark accepted
+    await supabase
+      .from("project_members")
+      .insert([
+        { project_id: invite.project_id, user_id: userId, role: invite.role },
+      ]);
+
+    const { error: updErr } = await supabase
+      .from("project_invitations")
+      .update({ status: "accepted" })
+      .eq("id", invitationId);
+    if (updErr) throw updErr;
+
+    return true;
+  },
+
+  async declineInvitation(invitationId) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const email = session?.user?.email;
+    if (!email) throw new Error("User not authenticated");
+
+    const { error } = await supabase
+      .from("project_invitations")
+      .update({ status: "declined" })
+      .eq("id", invitationId)
+      .eq("email", email);
+    if (error) throw error;
+    return true;
+  },
   async getByProject(projectId) {
     // Try to include profile info; if profiles table is missing, fall back gracefully
     const { data, error } = await supabase

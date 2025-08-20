@@ -1,19 +1,40 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import ProjectModal from "./Projects/ProjectModal";
+import { projectMembersApi } from "../lib/api";
+import { useNotifications } from "../context/NotificationContext";
 
 function Header() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { notify } = useNotifications();
+  const [invites, setInvites] = useState([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+  const loadInvites = async () => {
+    if (!user) return setInvites([]);
+    setLoadingInvites(true);
+    try {
+      const data = await projectMembersApi.getInvitationsForCurrentUser();
+      setInvites(data);
+    } catch (e) {
+      // noop
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInvites();
+  }, [user]);
   const location = useLocation();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     const { error } = await logout();
     if (error) {
-      alert("Error logging out: " + error.message);
+      notify({ type: "error", message: "Error logging out: " + error.message });
     }
   };
 
@@ -66,6 +87,104 @@ function Header() {
               </div>
               <div className="h-9 w-9 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                 {user.email ? user.email.charAt(0).toUpperCase() : "?"}
+              </div>
+              <div className="ml-3 relative">
+                <button
+                  onClick={loadInvites}
+                  className="relative px-3 py-1.5 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 text-sm"
+                  title="Refresh invitations"
+                >
+                  Invites
+                  {invites.length > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium leading-none text-white bg-red-600 rounded-full">
+                      {invites.length}
+                    </span>
+                  )}
+                </button>
+                {invites.length > 0 && (
+                  <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-200 text-sm font-medium">
+                        Pending Invitations
+                      </span>
+                      <button
+                        onClick={loadInvites}
+                        className="text-xs text-gray-400 hover:text-gray-200"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-auto">
+                      {invites.map((inv) => (
+                        <div
+                          key={inv.id}
+                          className="p-2 bg-gray-700 rounded-md"
+                        >
+                          <div className="text-sm text-gray-200">
+                            Project invite
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Role: {inv.role}
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              className="px-2 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-500"
+                              onClick={async () => {
+                                try {
+                                  await projectMembersApi.acceptInvitation(
+                                    inv.id
+                                  );
+                                  notify({
+                                    type: "success",
+                                    message: `Joined project ${
+                                      inv.projects?.name || ""
+                                    }`,
+                                  });
+                                  await loadInvites();
+                                  if (location.pathname !== "/projects")
+                                    navigate("/projects");
+                                } catch (e) {
+                                  notify({
+                                    type: "error",
+                                    message:
+                                      e.message || "Failed to accept invite",
+                                  });
+                                }
+                              }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              className="px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-500"
+                              onClick={async () => {
+                                try {
+                                  await projectMembersApi.declineInvitation(
+                                    inv.id
+                                  );
+                                  notify({
+                                    type: "info",
+                                    message: `Declined invite for ${
+                                      inv.projects?.name || "project"
+                                    }`,
+                                  });
+                                  await loadInvites();
+                                } catch (e) {
+                                  notify({
+                                    type: "error",
+                                    message:
+                                      e.message || "Failed to decline invite",
+                                  });
+                                }
+                              }}
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

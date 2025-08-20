@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useProjects } from "../../context/ProjectContext";
+import { useNotifications } from "../../context/NotificationContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 function InviteModal({ projectId, onClose }) {
@@ -9,6 +10,7 @@ function InviteModal({ projectId, onClose }) {
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
   const { inviteMember } = useProjects();
+  const { notify } = useNotifications();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,18 +33,22 @@ function InviteModal({ projectId, onClose }) {
 
     try {
       const result = await inviteMember(projectId, email, role);
-      if (result?.added) {
-        setSuccess(result.message || `Added ${email} to the project`);
-      } else if (result?.alreadyMember) {
-        setSuccess(result.message || `${email} is already a member`);
-      } else if (result?.pending) {
-        setSuccess(result.message || `Invitation sent to ${email}`);
-      } else {
-        setSuccess(result.message || `Invitation processed for ${email}`);
-      }
+      const message =
+        (result && result.message) ||
+        (result?.added
+          ? `Added ${email} to the project`
+          : result?.alreadyMember
+          ? `${email} is already a member`
+          : result?.pending
+          ? `Invitation sent to ${email}`
+          : `Invitation processed for ${email}`);
+      setSuccess(message);
+      notify({ type: result?.added ? "success" : "info", message });
       setEmail("");
     } catch (err) {
-      setError(err.message || "Failed to send invitation");
+      const message = err.message || "Failed to send invitation";
+      setError(message);
+      notify({ type: "error", message });
     } finally {
       setLoading(false);
     }

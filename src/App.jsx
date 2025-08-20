@@ -11,6 +11,7 @@ import ProjectDetail from "./components/Projects/ProjectDetail";
 import { TaskProvider } from "./context/TaskContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";
+import { NotificationsProvider } from "./context/NotificationContext";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
@@ -74,15 +75,17 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
-          <DndProvider backend={HTML5Backend}>
-            <ProjectProvider>
-              <TaskProvider>
-                <AppRoutes />
-              </TaskProvider>
-            </ProjectProvider>
-          </DndProvider>
-        </div>
+        <NotificationsProvider>
+          <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
+            <DndProvider backend={HTML5Backend}>
+              <ProjectProvider>
+                <TaskProvider>
+                  <AppRoutes />
+                </TaskProvider>
+              </ProjectProvider>
+            </DndProvider>
+          </div>
+        </NotificationsProvider>
       </AuthProvider>
     </Router>
   );

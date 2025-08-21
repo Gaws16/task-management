@@ -8,6 +8,7 @@ export const projectsApi = {
       .from("projects")
       .select("*")
       .order("created_at", { ascending: false });
+    console.log("projects", projects);
 
     if (projectsError) throw projectsError;
 
@@ -142,7 +143,6 @@ export const projectMembersApi = {
       data: { session },
     } = await supabase.auth.getSession();
     const email = session?.user?.email;
-    console.log("email", email);
 
     if (!email) return [];
 

@@ -142,11 +142,13 @@ export const projectMembersApi = {
       data: { session },
     } = await supabase.auth.getSession();
     const email = session?.user?.email;
+    console.log("email", email);
+
     if (!email) return [];
 
     const { data, error } = await supabase
       .from("project_invitations")
-      .select("id, project_id, email, role, status, created_at")
+      .select("*")
       .eq("email", email)
       .eq("status", "pending")
       .order("created_at", { ascending: false });

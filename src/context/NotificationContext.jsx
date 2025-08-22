@@ -50,9 +50,9 @@ export function NotificationsProvider({ children }) {
               exit={{ opacity: 0, y: -8 }}
               className={`rounded-lg p-3 shadow border text-sm ${
                 n.type === "error"
-                  ? "bg-red-500/10 border-red-500 text-red-200"
+                  ? "bg-red-500/20 border-red-500 text-red-200"
                   : n.type === "success"
-                  ? "bg-green-500/10 border-green-500 text-green-200"
+                  ? "bg-green-500/25 border-green-400 text-green-100"
                   : "bg-gray-700 border-gray-600 text-gray-200"
               }`}
             >

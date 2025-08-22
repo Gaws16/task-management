@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useProjects } from "../context/ProjectContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import ProjectModal from "./Projects/ProjectModal";
@@ -8,17 +9,24 @@ import { useNotifications } from "../context/NotificationContext";
 
 function Header() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isInvitesOpen, setIsInvitesOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { projects, loadProjects } = useProjects();
   const { notify } = useNotifications();
   const [invites, setInvites] = useState([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
+  const invitesRef = useRef(null);
+
   const loadInvites = async () => {
     if (!user) return setInvites([]);
     setLoadingInvites(true);
+    console.log("loading invites");
     try {
-      const data = await projectMembersApi.getInvitatibonsForCurrentUser();
+      const data = await projectMembersApi.getInvitationsForCurrentUser();
+      console.log("Invites data:", data);
       setInvites(data);
     } catch (e) {
+      console.error("Error loading invites:", e);
     } finally {
       setLoadingInvites(false);
     }
@@ -27,6 +35,23 @@ function Header() {
   useEffect(() => {
     loadInvites();
   }, [user]);
+
+  // Handle click outside to close invites popup
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (invitesRef.current && !invitesRef.current.contains(event.target)) {
+        setIsInvitesOpen(false);
+      }
+    };
+
+    if (isInvitesOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isInvitesOpen]);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -87,9 +112,12 @@ function Header() {
               <div className="h-9 w-9 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                 {user.email ? user.email.charAt(0).toUpperCase() : "?"}
               </div>
-              <div className="ml-3 relative">
+              <div className="ml-3 relative" ref={invitesRef}>
                 <button
-                  onClick={loadInvites}
+                  onClick={() => {
+                    loadInvites();
+                    setIsInvitesOpen(!isInvitesOpen);
+                  }}
                   className="relative px-3 py-1.5 rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 text-sm"
                   title="Refresh invitations"
                 >
@@ -100,20 +128,29 @@ function Header() {
                     </span>
                   )}
                 </button>
-                {invites.length > 0 && (
+                {invites && invites.length > 0 && isInvitesOpen && (
                   <div className="absolute right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 p-3">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-200 text-sm font-medium">
-                        Pending Invitations
+                        Pending Invitations ({invites.length})
                       </span>
-                      <button
-                        onClick={loadInvites}
-                        className="text-xs text-gray-400 hover:text-gray-200"
-                      >
-                        Refresh
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={loadInvites}
+                          className="text-xs text-gray-400 hover:text-gray-200"
+                        >
+                          Refresh
+                        </button>
+                        <button
+                          onClick={() => setIsInvitesOpen(false)}
+                          className="text-xs text-gray-400 hover:text-gray-200"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2 max-h-64 overflow-auto">
+                      {console.log("Rendering invites:", invites)}
                       {invites.map((inv) => (
                         <div
                           key={inv.id}
@@ -140,6 +177,8 @@ function Header() {
                                     }`,
                                   });
                                   await loadInvites();
+                                  await loadProjects(); // Refresh projects list
+                                  setIsInvitesOpen(false);
                                   if (location.pathname !== "/projects")
                                     navigate("/projects");
                                 } catch (e) {
@@ -167,6 +206,7 @@ function Header() {
                                     }`,
                                   });
                                   await loadInvites();
+                                  setIsInvitesOpen(false);
                                 } catch (e) {
                                   notify({
                                     type: "error",

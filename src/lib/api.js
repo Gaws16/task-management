@@ -199,7 +199,7 @@ export const projectMembersApi = {
 
     const { error } = await supabase
       .from("project_invitations")
-      .update({ status: " " })
+      .update({ status: "declined" })
       .eq("id", invitationId)
       .eq("email", email);
     if (error) throw error;

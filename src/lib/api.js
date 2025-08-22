@@ -8,7 +8,6 @@ export const projectsApi = {
       .from("projects")
       .select("*")
       .order("created_at", { ascending: false });
-    console.log("projects", projects);
 
     if (projectsError) throw projectsError;
 
@@ -148,7 +147,7 @@ export const projectMembersApi = {
 
     const { data, error } = await supabase
       .from("project_invitations")
-      .select("*")
+      .select("*, projects:project_id(*)")
       .eq("email", email)
       .eq("status", "pending")
       .order("created_at", { ascending: false });
@@ -200,7 +199,7 @@ export const projectMembersApi = {
 
     const { error } = await supabase
       .from("project_invitations")
-      .update({ status: "declined" })
+      .update({ status: " " })
       .eq("id", invitationId)
       .eq("email", email);
     if (error) throw error;

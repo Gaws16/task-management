@@ -24,6 +24,7 @@ function TaskModal({ task = null, projectId, onClose }) {
   // Load project members
   useEffect(() => {
     if (currentProject && currentProject.project_members) {
+      console.log(currentProject);
       // Extract members data from project
       const members = currentProject.project_members.map((member) => ({
         id: member.user_id,
@@ -41,11 +42,6 @@ function TaskModal({ task = null, projectId, onClose }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Change assigned user
-  const handleAssigneeChange = (userId) => {
-    setFormData((prev) => ({ ...prev, assignee_id: userId || null }));
   };
 
   // Save the task
@@ -207,61 +203,30 @@ function TaskModal({ task = null, projectId, onClose }) {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-3 text-gray-300">
+                    <label className="block text-sm font-medium mb-1 text-gray-300">
                       Assigned To
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Option for no assignment */}
-                      <div
-                        onClick={() => handleAssigneeChange("")}
-                        className={`flex flex-col items-center p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                          !formData.assignee_id
-                            ? "bg-gray-600 ring-2 ring-indigo-500"
-                            : "bg-gray-700 hover:bg-gray-600"
-                        }`}
-                      >
-                        <div className="h-10 w-10 rounded-full bg-gray-500 flex items-center justify-center mb-2">
-                          <svg
-                            className="h-6 w-6 text-gray-300"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                            />
-                          </svg>
-                        </div>
-                        <span className="text-xs text-gray-300 font-medium">
-                          Unassigned
-                        </span>
-                      </div>
-
-                      {/* User cards */}
+                    <select
+                      name="assignee_id"
+                      value={formData.assignee_id || ""}
+                      onChange={handleChange}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 appearance-none"
+                      style={{
+                        backgroundImage:
+                          "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")",
+                        backgroundPosition: "right 0.5rem center",
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: "1.5em 1.5em",
+                        paddingRight: "2.5rem",
+                      }}
+                    >
+                      <option value="">Unassigned</option>
                       {projectMembers.map((member) => (
-                        <div
-                          key={member.id}
-                          onClick={() => handleAssigneeChange(member.id)}
-                          className={`flex flex-col items-center p-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                            formData.assignee_id === member.id
-                              ? "bg-gray-600 ring-2 ring-indigo-500"
-                              : "bg-gray-700 hover:bg-gray-600"
-                          }`}
-                        >
-                          <img
-                            src={member.avatar}
-                            alt={member.email}
-                            className="h-10 w-10 rounded-full object-cover mb-2"
-                          />
-                          <span className="text-xs text-gray-300 font-medium truncate w-full text-center">
-                            {member.email}
-                          </span>
-                        </div>
+                        <option key={member.id} value={member.id}>
+                          {member.email}
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
 
                   <div>

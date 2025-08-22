@@ -12,7 +12,7 @@ export function ProjectProvider({ children }) {
   const { user } = useAuth();
 
   // Load all projects for the current user
-  useEffect(() => {
+  const loadProjects = async () => {
     if (!user) {
       setProjects([]);
       setCurrentProject(null);
@@ -20,20 +20,20 @@ export function ProjectProvider({ children }) {
       return;
     }
 
-    async function loadProjects() {
-      setLoading(true);
-      try {
-        const data = await projectsApi.getAll();
-        setProjects(data);
-        setLoading(false);
-        setError(null);
-      } catch (err) {
-        console.error("Error loading projects:", err);
-        setError("Failed to load projects");
-        setLoading(false);
-      }
+    setLoading(true);
+    try {
+      const data = await projectsApi.getAll();
+      setProjects(data);
+      setLoading(false);
+      setError(null);
+    } catch (err) {
+      console.error("Error loading projects:", err);
+      setError("Failed to load projects");
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadProjects();
   }, [user]);
 
@@ -193,6 +193,7 @@ export function ProjectProvider({ children }) {
     deleteProject,
     inviteMember,
     removeMember,
+    loadProjects,
     hasRole,
   };
 

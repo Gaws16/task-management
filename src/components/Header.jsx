@@ -20,10 +20,8 @@ function Header() {
   const loadInvites = async () => {
     if (!user) return setInvites([]);
     setLoadingInvites(true);
-    console.log("loading invites");
     try {
       const data = await projectMembersApi.getInvitationsForCurrentUser();
-      console.log("Invites data:", data);
       setInvites(data);
     } catch (e) {
       console.error("Error loading invites:", e);

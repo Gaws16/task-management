@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 
 function ProjectCard({ project, onClick }) {
+  console.log(project);
   return (
     <motion.div
       key={project.id}
@@ -18,7 +19,7 @@ function ProjectCard({ project, onClick }) {
         <div className="flex justify-between items-center">
           <div className="flex space-x-2">
             <div className="text-sm text-gray-400">
-              {project.project_members?.length || 1} members
+              {project.members?.length || 1} members
             </div>
           </div>
           <span className="text-sm text-gray-500">

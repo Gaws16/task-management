@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 
 function ProjectCard({ project, onClick }) {
-  console.log(project);
   return (
     <motion.div
       key={project.id}

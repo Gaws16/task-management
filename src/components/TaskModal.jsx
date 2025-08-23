@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 function TaskModal({ task = null, projectId, onClose }) {
   const { statuses, addTask, updateTask, deleteTask } = useTasks();
   const { currentProject } = useProjects();
+
   const { user } = useAuth();
 
   // Initial state for a new task or editing an existing one
@@ -23,10 +24,10 @@ function TaskModal({ task = null, projectId, onClose }) {
 
   // Load project members
   useEffect(() => {
-    if (currentProject && currentProject.project_members) {
-      console.log(currentProject);
+    if (currentProject && currentProject.members) {
+      console.log(currentProject.members);
       // Extract members data from project
-      const members = currentProject.project_members.map((member) => ({
+      const members = currentProject.members.map((member) => ({
         id: member.user_id,
         email: member.email || "Team Member", // Fallback if email not available
         avatar: `https://ui-avatars.com/api/?name=${

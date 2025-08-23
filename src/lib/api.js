@@ -41,6 +41,16 @@ export const projectsApi = {
       .from("project_members")
       .select("id, user_id, role") // you can also join profiles here
       .eq("project_id", id);
+    /* const membersWithEmail = await Promise.all(
+      members.map(async (member) => {
+        const { data: profile, error: profileError } = await supabase
+          .from("users")
+          .select("id, email")
+          .eq("id", member.user_id)
+          .single();
+        return { ...member, email: profile?.email };
+      })
+    ); */
 
     if (membersError) throw membersError;
 

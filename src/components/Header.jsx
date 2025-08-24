@@ -1,16 +1,20 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useProjects } from "../context/ProjectContext";
+import { useProfile } from "../context/ProfileContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import ProjectModal from "./Projects/ProjectModal";
+import ProfileModal from "./ProfileModal";
 import { projectMembersApi } from "../lib/api";
 import { useNotifications } from "../context/NotificationContext";
 
 function Header() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isInvitesOpen, setIsInvitesOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { profile } = useProfile();
   const { projects, loadProjects } = useProjects();
   const { notify } = useNotifications();
   const [invites, setInvites] = useState([]);
@@ -98,7 +102,7 @@ function Header() {
             <div className="flex items-center mr-4">
               <div className="flex flex-col items-end mr-3">
                 <span className="text-sm text-gray-300 font-medium">
-                  {user.email}
+                  {profile?.full_name || user.email}
                 </span>
                 <button
                   onClick={handleLogout}
@@ -107,9 +111,40 @@ function Header() {
                   Sign Out
                 </button>
               </div>
-              <div className="h-9 w-9 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                {user.email ? user.email.charAt(0).toUpperCase() : "?"}
-              </div>
+              <motion.button
+                onClick={() => setIsProfileModalOpen(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="h-9 w-9 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:bg-indigo-700 transition-colors duration-200 overflow-hidden"
+                title="Click to edit profile"
+              >
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextSibling.style.display = "flex";
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-full h-full flex items-center justify-center ${
+                    profile?.avatar_url ? "hidden" : "flex"
+                  }`}
+                >
+                  {profile?.full_name
+                    ? profile.full_name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                    : user.email
+                    ? user.email.charAt(0).toUpperCase()
+                    : "?"}
+                </div>
+              </motion.button>
               <div className="ml-3 relative" ref={invitesRef}>
                 <button
                   onClick={() => {
@@ -230,6 +265,11 @@ function Header() {
         {isProjectModalOpen && (
           <ProjectModal onClose={() => setIsProjectModalOpen(false)} />
         )}
+
+        <ProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+        />
       </div>
     </header>
   );

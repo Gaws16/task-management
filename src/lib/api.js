@@ -36,25 +36,31 @@ export const projectsApi = {
 
     if (projectError) throw projectError;
 
-    // Get project members separately
+    // Get project members with profile data
     const { data: members, error: membersError } = await supabase
       .from("project_members")
-      .select("id, user_id, role") // you can also join profiles here
+      .select(
+        `
+        id, 
+        user_id, 
+        role,
+        profiles!inner(email, full_name)
+      `
+      )
       .eq("project_id", id);
-    /* const membersWithEmail = await Promise.all(
-      members.map(async (member) => {
-        const { data: profile, error: profileError } = await supabase
-          .from("users")
-          .select("id, email")
-          .eq("id", member.user_id)
-          .single();
-        return { ...member, email: profile?.email };
-      })
-    ); */
 
     if (membersError) throw membersError;
 
-    return { ...project, members };
+    // Transform the data to flatten the profiles data
+    const transformedMembers = members.map((member) => ({
+      id: member.id,
+      user_id: member.user_id,
+      role: member.role,
+      email: member.profiles?.email || "Unknown",
+      full_name: member.profiles?.full_name || null,
+    }));
+
+    return { ...project, members: transformedMembers };
   },
   async create(project) {
     // Get current user ID
@@ -541,5 +547,52 @@ export const tasksApi = {
 
     if (error) throw error;
     return true;
+  },
+};
+
+// Profile API
+export const profileApi = {
+  async getCurrentUserProfile() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updateProfile(updates) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getUserProfile(userId) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (error) throw error;
+    return data;
   },
 };

@@ -25,13 +25,15 @@ function TaskModal({ task = null, projectId, onClose }) {
   // Load project members
   useEffect(() => {
     if (currentProject && currentProject.members) {
-      console.log(currentProject.members);
+      console.log("Current project members:", currentProject.members);
       // Extract members data from project
       const members = currentProject.members.map((member) => ({
         id: member.user_id,
         email: member.email || "Team Member", // Fallback if email not available
+        full_name: member.full_name || null,
+        display_name: member.full_name || member.email || "Team Member",
         avatar: `https://ui-avatars.com/api/?name=${
-          member.email || "User"
+          member.full_name || member.email || "User"
         }&background=random`,
       }));
 
@@ -224,7 +226,7 @@ function TaskModal({ task = null, projectId, onClose }) {
                       <option value="">Unassigned</option>
                       {projectMembers.map((member) => (
                         <option key={member.id} value={member.id}>
-                          {member.email}
+                          {member.display_name}
                         </option>
                       ))}
                     </select>

@@ -36,29 +36,57 @@ export const projectsApi = {
 
     if (projectError) throw projectError;
 
-    // Get project members with profile data
+    // Get project members first (no joins)
     const { data: members, error: membersError } = await supabase
       .from("project_members")
-      .select(
-        `
-        id, 
-        user_id, 
-        role,
-        profiles!inner(email, full_name)
-      `
-      )
+      .select("id, user_id, role")
       .eq("project_id", id);
 
     if (membersError) throw membersError;
 
-    // Transform the data to flatten the profiles data
-    const transformedMembers = members.map((member) => ({
-      id: member.id,
-      user_id: member.user_id,
-      role: member.role,
-      email: member.profiles?.email || "Unknown",
-      full_name: member.profiles?.full_name || null,
-    }));
+    // If there are no members, return early
+    if (!members || members.length === 0) {
+      return { ...project, members: [] };
+    }
+
+    // Fetch profiles for the member user_ids and merge locally
+    const userIds = members.map((m) => m.user_id);
+
+    let profilesById = {};
+    try {
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, avatar_url")
+        .in("id", userIds);
+
+      if (profilesError) {
+        // If profiles table is missing or inaccessible, continue with bare members
+        if (profilesError.code !== "PGRST205") throw profilesError;
+      } else if (profiles && profiles.length > 0) {
+        profilesById = profiles.reduce((acc, p) => {
+          acc[p.id] = p;
+          return acc;
+        }, {});
+      }
+    } catch (e) {
+      // Swallow profiles lookup errors so project fetch still works
+      console.warn(
+        "Profiles lookup failed, returning bare members:",
+        e?.message || e
+      );
+    }
+
+    const transformedMembers = members.map((m) => {
+      const profile = profilesById[m.user_id];
+      return {
+        id: m.id,
+        user_id: m.user_id,
+        role: m.role,
+        email: profile?.email,
+        full_name: profile?.full_name,
+        avatar_url: profile?.avatar_url,
+      };
+    });
 
     return { ...project, members: transformedMembers };
   },

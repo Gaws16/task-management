@@ -66,14 +66,6 @@ export function AuthProvider({ children }) {
       // Use the newly created user's id
       const userId = data.user.id;
 
-      /*  // Insert profile row with matching id
-      const { error: insertError } = await supabase.from("profiles").insert({
-        id: userId,
-        email,
-      });
-
-      if (insertError) throw insertError; */
-
       return { data, error: null };
     } catch (error) {
       return { data: null, error };

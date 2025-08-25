@@ -307,18 +307,35 @@ export const projectMembersApi = {
     try {
       const { data, error: profileError } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, email")
         .eq("email", email)
         .limit(1)
         .maybeSingle();
       if (profileError && profileError.code !== "PGRST116") {
         // If the profiles table is missing (PGRST205), fall back to anon invite placeholder
         if (profileError.code === "PGRST205") {
+          // Record a pending invitation so the user can accept later
+          const { data: inviteData } = await supabase
+            .from("project_invitations")
+            .insert([
+              {
+                project_id: projectId,
+                email,
+                role,
+                invited_by: (
+                  await supabase.auth.getSession()
+                ).data.session?.user?.id,
+                status: "pending",
+              },
+            ])
+            .select()
+            .single();
           return {
             pending: true,
             email,
             message:
-              "Could not verify user in profiles; sent a placeholder invite.",
+              "Profiles table not available; invitation recorded as pending.",
+            inviteId: inviteData?.id,
           };
         }
         throw profileError;
@@ -327,18 +344,35 @@ export const projectMembersApi = {
     } catch (err) {
       // If the table truly doesn't exist in schema cache, surface a friendly message
       if (err && err.code === "PGRST205") {
+        const { data: inviteData } = await supabase
+          .from("project_invitations")
+          .insert([
+            {
+              project_id: projectId,
+              email,
+              role,
+              invited_by: (
+                await supabase.auth.getSession()
+              ).data.session?.user?.id,
+              status: "pending",
+            },
+          ])
+          .select()
+          .single();
         return {
           pending: true,
           email,
           message:
             "Profiles table not available; invite recorded locally only.",
+          inviteId: inviteData?.id,
         };
       }
       throw err;
     }
 
+    // If user already exists, do not auto-add; require accepting the invite
     if (profiles) {
-      // User exists in profiles, check if they're already a member
+      // Check if they're already a member
       const { data: existingMember, error: memberCheckError } = await supabase
         .from("project_members")
         .select("id, role")
@@ -357,21 +391,7 @@ export const projectMembersApi = {
         };
       }
 
-      // User exists but not a member, add them to the project
-      const added = await this.addMember(projectId, profiles.id, role);
-      return added?.id
-        ? {
-            added: true,
-            member: added,
-            message: `Added ${email} to the project`,
-          }
-        : {
-            added: false,
-            alreadyMember: true,
-            message: `${email} is already a member`,
-          };
-    } else {
-      // User doesn't exist in profiles - check if there's already a pending invitation
+      // Check for existing pending invitation
       const { data: existingInvite, error: inviteCheckError } = await supabase
         .from("project_invitations")
         .select("id, status, created_at")
@@ -393,49 +413,105 @@ export const projectMembersApi = {
         };
       }
 
-      // No existing invitation, create a new one
-      try {
-        const { data: inviteData, error: inviteError } = await supabase
-          .from("project_invitations")
-          .insert([
-            {
-              project_id: projectId,
-              email: email,
-              role: role,
-              invited_by: (
-                await supabase.auth.getSession()
-              ).data.session?.user?.id,
-              status: "pending",
-            },
-          ])
-          .select()
-          .single();
+      // Create a new pending invitation
+      const { data: inviteData, error: inviteError } = await supabase
+        .from("project_invitations")
+        .insert([
+          {
+            project_id: projectId,
+            email,
+            role,
+            invited_by: (
+              await supabase.auth.getSession()
+            ).data.session?.user?.id,
+            status: "pending",
+          },
+        ])
+        .select()
+        .single();
 
-        if (inviteError) {
-          console.error("Failed to store invitation:", inviteError);
+      if (inviteError) {
+        // Handle unique constraint (already invited before but not pending)
+        if (inviteError.code === "23505") {
           return {
             pending: true,
             email,
-            message: `Invitation recorded for ${email} (email service not configured)`,
-            error: inviteError.message,
+            message: `An invitation for ${email} already exists.`,
           };
         }
+        throw inviteError;
+      }
 
+      return {
+        pending: true,
+        email,
+        message: `Invitation recorded for ${email}. They can accept it from the header.`,
+        inviteId: inviteData?.id,
+      };
+    }
+
+    // User doesn't exist in profiles - previous behavior: create pending invite
+    const { data: existingInvite, error: inviteCheckError } = await supabase
+      .from("project_invitations")
+      .select("id, status, created_at")
+      .eq("project_id", projectId)
+      .eq("email", email)
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (inviteCheckError) throw inviteCheckError;
+
+    if (existingInvite) {
+      return {
+        pending: true,
+        email,
+        message: `Invitation already sent to ${email} on ${new Date(
+          existingInvite.created_at
+        ).toLocaleDateString()}`,
+        inviteId: existingInvite.id,
+      };
+    }
+
+    // No existing invitation, create a new one
+    try {
+      const { data: inviteData, error: inviteError } = await supabase
+        .from("project_invitations")
+        .insert([
+          {
+            project_id: projectId,
+            email: email,
+            role: role,
+            invited_by: (
+              await supabase.auth.getSession()
+            ).data.session?.user?.id,
+            status: "pending",
+          },
+        ])
+        .select()
+        .single();
+
+      if (inviteError) {
         return {
           pending: true,
           email,
-          message: `Invitation recorded for ${email}. They'll be added when they sign up.`,
-          inviteId: inviteData?.id,
-        };
-      } catch (inviteErr) {
-        console.error("Error storing invitation:", inviteErr);
-        return {
-          pending: true,
-          email,
-          message: `Invitation recorded for ${email}`,
-          error: inviteErr.message,
+          message: `Invitation recorded for ${email} (email service not configured)`,
+          error: inviteError.message,
         };
       }
+
+      return {
+        pending: true,
+        email,
+        message: `Invitation recorded for ${email}. They'll be added when they accept or sign up.`,
+        inviteId: inviteData?.id,
+      };
+    } catch (inviteErr) {
+      return {
+        pending: true,
+        email,
+        message: `Invitation recorded for ${email}`,
+        error: inviteErr.message,
+      };
     }
   },
 
